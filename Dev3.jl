@@ -99,10 +99,19 @@ end
 
 # Add constraint to turn off the lines with switch if flow is zero
 
-
 # Solve the model
 optimize!(model)
  
+# Update the z state if the corresponding line power flow is zero
+# Create a new dictionary to store the adjusted line status
+adjusted_z = Dict((i, j) => value(z[(i, j)]) for (i, j) in L)
+
+# Update the z state if the corresponding line power flow is zero
+for (i, j) in SL
+    if abs(value(P_ij[(i, j)])) < 1e-3  # Consider small tolerance for floating point precision
+        adjusted_z[(i, j)] = 0  # Set the adjusted status to 0
+    end
+end
 
 # Define Crayons for styling text
 bold_green = Crayon(foreground = :green, bold = true)
@@ -115,7 +124,10 @@ if termination_status(model) == MOI.OPTIMAL
     println("Generation Output:\n", join(value.(P_g), "\n"))
     println("Voltage Angles:\n", join(value.(θ), "\n"))
     println("Line Flows:\n", join(value.(P_ij), "\n"))
-    println("Line Status:\n", join(value.(z), "\n"))
+    println("Line Status:\n")
+    for (i, j) in L
+        println("Line ", (i, j), ": Status = ", adjusted_z[(i, j)])
+    end
 else
     println(bold_red("The model did not find an optimal solution."))
     # Use the IIS (Irreducible Infeasible Subsystem) to debug infeasibility
@@ -123,7 +135,8 @@ else
     compute_conflict!(model)
     conflict_summary(model)
 end
-
+# Convert the adjusted_z values into a vector
+adjusted_z_values = [adjusted_z[(i, j)] for (i, j) in L]
 # Create a DataFrame to store the results
 results = DataFrame()
 
@@ -134,7 +147,7 @@ if termination_status(model) == MOI.OPTIMAL
     results[!, :GenerationOutput] = [join(value.(P_g))]
     results[!, :VoltageAngles] = [join(value.(θ))]
     results[!, :LineFlows] = [join(value.(P_ij))]
-    results[!, :LineStatus] = [join(value.(z))]
+    results[!, :LineStatus] = [join(string.(adjusted_z_values))]
 else
     results[!, :Status] = ["The model did not find an optimal solution."]
     results[!, :ObjectiveValue] = [NaN]
