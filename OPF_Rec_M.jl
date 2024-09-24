@@ -5,6 +5,7 @@ clearconsole()
 using JuMP
 using Gurobi
 using Statistics
+using Crayons
 
 # Define the sets and parameters
 G = 1:3                  # Set of generators
@@ -84,14 +85,25 @@ end
 # Solve the model
 optimize!(model)
  
+
+# Define Crayons for styling text
+bold_green = Crayon(foreground = :green, bold = true)
+bold_red = Crayon(foreground = :red, bold = true)
+
 # Check the solution status and print results
 if termination_status(model) == MOI.OPTIMAL
-    println("Optimal solution found!")
-    println("Objective Value: ", objective_value(model))
-    println("Generation Output: ", value.(P_g))
-    println("Voltage Angles: ", value.(θ))
-    println("Line Flows: ", value.(P_ij))
-    println("Line Status: ", value.(z))
+    println(bold_green("Optimal solution found!"))
+    println("Objective Value:\n", objective_value(model))
+    println("Generation Output:\n", join(value.(P_g), "\n"))
+    println("Voltage Angles:\n", join(value.(θ), "\n"))
+    println("Line Flows:\n", join(value.(P_ij), "\n"))
+    println("Line Status:\n", join(value.(z), "\n"))
 else
-    println("The model did not find an optimal solution.")
+    println(bold_red("The model did not find an optimal solution."))
+    # Use the IIS (Irreducible Infeasible Subsystem) to debug infeasibility
+    println("Identifying infeasibility...")
+    compute_conflict!(model)
+    conflict_summary(model)
 end
+
+
